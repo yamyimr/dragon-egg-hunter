@@ -36,6 +36,17 @@ body { background: var(--ink); color: var(--paper); overflow: hidden; font-famil
 #wardBtn { position: absolute; right: 10px; top: 108px; z-index: 4; font-size: .85rem; padding: 7px 10px; background: var(--rose); box-shadow: inset -2px -2px 0 #d0597f; }
 #statBtn { position: absolute; right: 10px; top: 150px; z-index: 4; font-size: .85rem; padding: 7px 10px; background: var(--gold); box-shadow: inset -2px -2px 0 #d1a42c; }
 #statModal .card { max-width: 560px; }
+#mailBtn { position: absolute; right: 10px; top: 192px; z-index: 4; font-size: .85rem; padding: 7px 10px; background: #7FC8FF; box-shadow: inset -2px -2px 0 #4d98d0; }
+#mailBtn[hidden] { display: none; }
+#mailBtn .dot { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; background: #E2483D; color: #fff; border-radius: 9px; font-size: .75rem; line-height: 18px; text-align: center; }
+.mail { border: 2px solid #000; background: #fff; padding: 10px 12px; margin-bottom: 8px; font-family: "Mitr", sans-serif; font-size: .88rem; }
+.mail h3 { margin: 0 0 4px; font-size: 1rem; color: #5a3fd0; font-family: "DotGothic16", "Mitr", sans-serif; font-weight: 400; }
+.mail .rw { color: #8A5A00; margin: 6px 0; }
+.mail.done { opacity: .55; }
+.adm label { display: block; margin: 6px 0 2px; font-family: "Mitr", sans-serif; font-size: .8rem; color: #cfc8f0; }
+.adm input, .adm textarea, .adm select { width: 100%; padding: 6px 8px; font-family: "Mitr", sans-serif; font-size: .85rem; background: #1f1a3d; color: #FFF6EC; border: 2px solid #000; }
+.adm textarea { height: 64px; resize: vertical; }
+.adm .two { display: flex; gap: 6px; } .adm .two > * { flex: 1; }
 .st-sec { margin: 10px 0 4px; color: #5a3fd0; font-size: 1.05rem; }
 .st-tbl { width: 100%; border-collapse: collapse; font-family: "Mitr", sans-serif; font-size: .86rem; }
 .st-tbl td { padding: 4px 6px; border-bottom: 1px solid #e3dcf3; }
@@ -48,7 +59,7 @@ body { background: var(--ink); color: var(--paper); overflow: hidden; font-famil
   body { flex-direction: column; }
   #side { position: fixed; left: 0; right: 0; bottom: 0; height: 62%; z-index: 6; width: 100%; border-left: 0; border-top: 3px solid #000; box-shadow: 0 -6px 0 rgba(0,0,0,.25); }
   #game #menuBtn, #game #wardBtn, #game #statBtn { font-size: .75rem; padding: 6px 8px; }
-  #game #menuBtn { top: 10px; } #game #wardBtn { top: 46px; } #game #statBtn { top: 82px; }
+  #game #menuBtn { top: 10px; } #game #wardBtn { top: 46px; } #game #statBtn { top: 82px; } #game #mailBtn { top: 118px; font-size: .75rem; padding: 6px 8px; }
   #game #joy { width: 120px; height: 120px; left: 40px; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
   #game #knob { width: 52px; height: 52px; margin: -26px 0 0 -26px; }
   #game #tDash { width: 82px; height: 82px; right: 56px; bottom: calc(104px + env(safe-area-inset-bottom, 0px)); font-size: .9rem; }
@@ -155,6 +166,14 @@ select { font-family: "Mitr", sans-serif; font-size: .8rem; width: 100%; padding
   </div>
   <button class="btn" id="wardBtn">👕 แต่งตัว</button>
   <button class="btn" id="statBtn">📊 สถานะ</button>
+  <button class="btn" id="mailBtn" hidden>📬 จดหมาย<span class="dot" id="mailDot" hidden>0</span></button>
+  <div class="modal" id="mailModal" hidden>
+    <div class="card">
+      <h2>กล่องจดหมาย</h2>
+      <div id="mailList"></div>
+      <div class="acts"><button class="btn ghost" id="mailClose">ปิด</button><button class="btn gold" id="mailAll">รับทั้งหมด</button></div>
+    </div>
+  </div>
   <div class="modal" id="statModal" hidden>
     <div class="card">
       <h2>สถานะของคุณ</h2>
@@ -256,6 +275,7 @@ select { font-family: "Mitr", sans-serif; font-size: .8rem; width: 100%; padding
     <button role="tab" data-tab="aura" aria-selected="false">ไอเทม</button>
     <button role="tab" data-tab="up" aria-selected="false">อัปเกรด</button>
     <button role="tab" data-tab="rb" aria-selected="false">Rebirth</button>
+    <button role="tab" data-tab="admin" aria-selected="false" id="adminTab" hidden>แอดมิน</button>
   </div>
   <div class="pane" id="pane"></div>
 </aside>
@@ -780,9 +800,10 @@ async function ensureToken() {
   try { const j = await supaAuth('token?grant_type=refresh_token', { refresh_token: supa.refresh_token }); setSession(j, supa.name); return true; }
   catch (e) { if (e.status === 400 || e.status === 401 || e.status === 403) { supa = null; supaOk = false; storeSession(null); toast('การเข้าสู่ระบบหมดอายุ กรุณาเข้าสู่ระบบใหม่', '#FF8FB8'); updateAcctUI(); } return false; }
 }
-async function supaRest(method, query, body, headers, keepalive) {
+async function supaRest(method, query, body, headers, keepalive) { return supaReq(method, 'saves' + query, body, headers, keepalive); }
+async function supaReq(method, path, body, headers, keepalive) {
   if (!await ensureToken()) throw new Error('no session');
-  const r = await fetch(SUPA.url + '/rest/v1/saves' + query, { method, keepalive: !!keepalive, headers: Object.assign({ apikey: SUPA.key, Authorization: 'Bearer ' + supa.access_token, 'Content-Type': 'application/json' }, headers || {}), body: body ? JSON.stringify(body) : undefined });
+  const r = await fetch(SUPA.url + '/rest/v1/' + path, { method, keepalive: !!keepalive, headers: Object.assign({ apikey: SUPA.key, Authorization: 'Bearer ' + supa.access_token, 'Content-Type': 'application/json' }, headers || {}), body: body ? JSON.stringify(body) : undefined });
   const tx = await r.text();
   if (!r.ok) throw Object.assign(new Error(tx || ('HTTP ' + r.status)), { status: r.status });
   return tx ? JSON.parse(tx) : null;
@@ -814,7 +835,114 @@ async function adoptCloud() {
     else toast('☁️ สร้างเซฟออนไลน์จากความคืบหน้าในเครื่องนี้แล้ว', '#7DE2C4');
     S.owner = supa.uid; await supaSave(true);
   }
-  localSave(); updateAcctUI();
+  localSave(); updateAcctUI(); afterLogin();
+}
+// ---------- mailbox / admin (needs the tables from the setup SQL) ----------
+let isAdmin = false, mails = [], claimed = new Set(), mailT = 0, admMails = [], admPlayers = [], admClaims = {}, admRender = false;
+const POT_NAMES = () => POT_KEYS.map(k => [k, POTIONS[k].name]);
+function rewardText(r) {
+  const out = [];
+  if (r.gold) out.push('💰 ' + fmt(r.gold) + ' เงิน');
+  if (r.goldMin) out.push('💰 รายได้ ' + r.goldMin + ' นาที');
+  if (r.tickets) out.push('🎫 ตั๋ว ' + r.tickets + ' ใบ');
+  (r.potions || []).forEach(p => { if (POTIONS[p.type]) out.push(POTIONS[p.type].icon + ' ' + POTIONS[p.type].name + POT_SIZE[p.tier] + ' ×' + p.count); });
+  return out.join(' · ') || 'ข้อความอย่างเดียว';
+}
+async function afterLogin() {
+  try { await supaReq('POST', 'profiles?on_conflict=user_id', { user_id: supa.uid, name: supa.name, updated_at: new Date().toISOString() }, { Prefer: 'resolution=merge-duplicates,return=minimal' }); } catch (e) {}
+  try { isAdmin = !!(await supaReq('POST', 'rpc/is_admin', {})); } catch (e) { isAdmin = false; }
+  $('adminTab').hidden = !isAdmin;
+  await refreshMail();
+}
+async function refreshMail() {
+  if (!supaOk || !supa) { $('mailBtn').hidden = true; return; }
+  try {
+    const now = Date.now();
+    const [m, c] = await Promise.all([supaReq('GET', 'mail?select=*&order=id.desc&limit=100'), supaReq('GET', 'mail_claims?select=mail_id&user_id=eq.' + supa.uid)]);
+    mails = (m || []).filter(x => (!x.to_user || x.to_user === supa.uid) && (!x.expires_at || Date.parse(x.expires_at) > now));
+    claimed = new Set((c || []).map(x => x.mail_id));
+  } catch (e) { mails = []; }
+  const n = mails.filter(x => !claimed.has(x.id)).length;
+  $('mailBtn').hidden = false; $('mailDot').hidden = !n; $('mailDot').textContent = n;
+  if (!$('mailModal').hidden) renderMail();
+  if (n && !mailT) toast('📬 มีจดหมายใหม่ ' + n + ' ฉบับ', '#7FC8FF');
+  mailT = 1;
+}
+function renderMail() {
+  const box = $('mailList'); box.innerHTML = '';
+  if (!mails.length) { box.appendChild(el('p', { text: 'ยังไม่มีจดหมาย' })); }
+  mails.forEach(m => {
+    const done = claimed.has(m.id);
+    const card = el('div', { class: 'mail' + (done ? ' done' : '') }, [el('h3', { text: m.title }), el('div', { text: m.body || '' }), el('div', { class: 'rw', text: rewardText(m.reward || {}) })]);
+    const b = el('button', { class: 'btn ' + (done ? 'ghost' : 'gold'), text: done ? 'รับแล้ว' : 'รับของ', onclick: () => claimMail(m) }); b.disabled = done;
+    card.appendChild(b); box.appendChild(card);
+  });
+  $('mailAll').disabled = !mails.some(m => !claimed.has(m.id));
+}
+async function claimMail(m) {
+  if (claimed.has(m.id)) return;
+  try { await supaReq('POST', 'mail_claims', { user_id: supa.uid, mail_id: m.id }, { Prefer: 'return=minimal' }); }
+  catch (e) { if (e.status === 409) { claimed.add(m.id); renderMail(); toast('ฉบับนี้รับไปแล้ว'); } else toast('รับของไม่สำเร็จ ลองใหม่อีกครั้ง', '#FF8FB8'); return; }
+  claimed.add(m.id);
+  const r = m.reward || {}; let gained = [];
+  if (r.gold) { S.gold += r.gold; gained.push('💰' + fmt(r.gold)); }
+  if (r.goldMin) { const g = Math.max(100, totalIncome() * 60 * r.goldMin); S.gold += g; gained.push('💰' + fmt(g)); }
+  if (r.tickets) { S.tickets += r.tickets; gained.push('🎫' + r.tickets); }
+  (r.potions || []).forEach(p => { if (POTIONS[p.type] && S.potions[p.type]) { S.potions[p.type][p.tier] += p.count; gained.push(POTIONS[p.type].icon + '×' + p.count); } });
+  SFX.fanfare(2); burst(P.x, P.y - 10, '#FFD45E', 20);
+  toast('📬 ได้รับ ' + (gained.join(' ') || 'ข้อความ'), '#FFD45E');
+  dirty = true; save(true); renderMail(); refreshMailDot();
+}
+function refreshMailDot() { const n = mails.filter(x => !claimed.has(x.id)).length; $('mailDot').hidden = !n; $('mailDot').textContent = n; }
+// admin tab
+const adm = { to: '', title: '', body: '', gold: '', goldMode: 'min', tickets: '', potType: '', potTier: '1', potCount: '1', exp: '7', msg: '' };
+async function admLoad() {
+  try {
+    const [m, pl, c] = await Promise.all([supaReq('GET', 'mail?select=*&order=id.desc&limit=50'), supaReq('GET', 'profiles?select=user_id,name&order=name'), supaReq('GET', 'mail_claims?select=mail_id')]);
+    admMails = m || []; admPlayers = pl || []; admClaims = {}; (c || []).forEach(x => { admClaims[x.mail_id] = (admClaims[x.mail_id] || 0) + 1; });
+  } catch (e) { adm.msg = 'โหลดข้อมูลแอดมินไม่สำเร็จ: ' + String(e.message).slice(0, 80); }
+  admRender = true; renderPanel();
+}
+function renderAdmin() {
+  const f = el('div', { class: 'adm' });
+  const inp = (key, attrs) => { const i = el(attrs.tag || 'input', Object.assign({}, attrs)); delete i.tag; i.value = adm[key]; i.addEventListener('input', () => { adm[key] = i.value; }); i.addEventListener('change', () => { adm[key] = i.value; }); return i; };
+  const sel = (key, opts) => { const x = el('select'); opts.forEach(([v, t]) => { const o = el('option', { value: v, text: t }); if (String(adm[key]) === String(v)) o.selected = true; x.appendChild(o); }); x.addEventListener('change', () => { adm[key] = x.value; }); return x; };
+  f.appendChild(el('h4', { text: 'ส่งจดหมาย / ของขวัญ' }));
+  f.appendChild(el('label', { text: 'ผู้รับ' })); f.appendChild(sel('to', [['', 'ทุกคน (รวมคนที่สมัครทีหลัง จนกว่าจะหมดอายุ)']].concat(admPlayers.map(p => [p.user_id, p.name]))));
+  f.appendChild(el('label', { text: 'หัวข้อ' })); f.appendChild(inp('title', { maxlength: '60', placeholder: 'เช่น ของขวัญสุดสัปดาห์' }));
+  f.appendChild(el('label', { text: 'ข้อความ' })); f.appendChild(inp('body', { tag: 'textarea', maxlength: '300' }));
+  f.appendChild(el('label', { text: 'เงิน' })); f.appendChild(el('div', { class: 'two' }, [inp('gold', { type: 'number', min: '0', placeholder: '0' }), sel('goldMode', [['min', 'นาทีของรายได้ผู้เล่น'], ['fix', 'จำนวนตายตัว']])]));
+  f.appendChild(el('label', { text: 'ตั๋วสุ่มออร่า (ใบ)' })); f.appendChild(inp('tickets', { type: 'number', min: '0', placeholder: '0' }));
+  f.appendChild(el('label', { text: 'น้ำยา' })); f.appendChild(el('div', { class: 'two' }, [sel('potType', [['', 'ไม่แจก']].concat(POT_NAMES())), sel('potTier', [['0', 'เล็ก'], ['1', 'กลาง'], ['2', 'ใหญ่']]), inp('potCount', { type: 'number', min: '1', max: '20' })]));
+  f.appendChild(el('label', { text: 'หมดอายุ' })); f.appendChild(sel('exp', [['1', '1 วัน'], ['3', '3 วัน'], ['7', '7 วัน'], ['30', '30 วัน'], ['0', 'ไม่หมดอายุ']]));
+  if (adm.msg) f.appendChild(el('p', { class: 'muted', text: adm.msg }));
+  f.appendChild(el('div', { style: 'margin-top:8px' }, [button('ส่ง', 'gold', true, admSend), button('รีเฟรช', 'ghost', true, admLoad)]));
+  pane.appendChild(f);
+  pane.appendChild(el('h4', { text: 'ส่งไปแล้ว' }));
+  if (!admMails.length) pane.appendChild(el('p', { class: 'muted', text: 'ยังไม่มี' }));
+  const nameOf = id => { const p = admPlayers.find(x => x.user_id === id); return p ? p.name : 'ผู้เล่น'; };
+  admMails.forEach(m => pane.appendChild(el('div', { class: 'row' }, [
+    el('div', { class: 'grow', html: '' }),
+    button('ลบ', 'ghost', true, () => confirmBox('ลบจดหมายนี้?', 'คนที่ยังไม่ได้รับจะไม่เห็นอีก (คนที่รับแล้วได้ของไปแล้ว)', async () => { try { await supaReq('DELETE', 'mail?id=eq.' + m.id); } catch (e) { toast('ลบไม่สำเร็จ'); } admLoad(); }))
+  ])));
+  // fill text safely (titles are user-entered)
+  const rows = pane.querySelectorAll('.row .grow'); const start = rows.length - admMails.length;
+  admMails.forEach((m, i) => { const g = rows[start + i]; if (!g) return; g.textContent = m.title; g.appendChild(el('br')); g.appendChild(el('small', { text: (m.to_user ? 'ถึง ' + nameOf(m.to_user) : 'ถึงทุกคน') + ' · ' + rewardText(m.reward || {}) + ' · รับแล้ว ' + (admClaims[m.id] || 0) + ' คน' + (m.expires_at ? ' · หมด ' + new Date(m.expires_at).toLocaleDateString('th-TH') : '') })); });
+}
+async function admSend() {
+  const title = adm.title.trim(); if (!title) { adm.msg = 'ใส่หัวข้อก่อน'; admRender = true; return; }
+  const reward = {}; const g = Math.max(0, Number(adm.gold) || 0);
+  if (g) { if (adm.goldMode === 'fix') reward.gold = g; else reward.goldMin = Math.min(10080, g); }
+  const t = Math.min(1000, Math.max(0, Math.floor(Number(adm.tickets) || 0))); if (t) reward.tickets = t;
+  if (adm.potType) reward.potions = [{ type: adm.potType, tier: Number(adm.potTier), count: Math.min(20, Math.max(1, Math.floor(Number(adm.potCount) || 1))) }];
+  const days = Number(adm.exp);
+  const row = { to_user: adm.to || null, title: title.slice(0, 60), body: adm.body.trim().slice(0, 300), reward, expires_at: days ? new Date(Date.now() + days * 864e5).toISOString() : null };
+  const who = adm.to ? (admPlayers.find(p => p.user_id === adm.to) || {}).name : 'ทุกคน';
+  confirmBox('ส่งจดหมายถึง ' + who + '?', title + ' · ' + rewardText(reward), async () => {
+    try { await supaReq('POST', 'mail', row, { Prefer: 'return=minimal' }); Object.assign(adm, { title: '', body: '', gold: '', tickets: '', potType: '', msg: '✅ ส่งแล้ว' }); toast('📬 ส่งจดหมายแล้ว', '#7DE2C4'); }
+    catch (e) { adm.msg = 'ส่งไม่สำเร็จ: ' + String(e.message).slice(0, 100); }
+    admLoad(); refreshMail();
+  });
 }
 function updateAcctUI() {
   const box = $('acctBox'), st = $('saveState');
@@ -830,7 +958,7 @@ function updateAcctUI() {
   if (tab === 'up') { dirty = true; renderPanel(); }
 }
 function openAcct() { $('acctMsg').textContent = ''; $('acctMsg').className = ''; $('acctModal').hidden = false; setTimeout(() => $('acctName').focus(), 50); }
-function logout() { save(true); supa = null; supaOk = false; storeSession(null); toast('ออกจากระบบแล้ว ความคืบหน้ายังเก็บในเครื่องนี้'); updateAcctUI(); }
+function logout() { save(true); supa = null; supaOk = false; storeSession(null); isAdmin = false; mails = []; $('adminTab').hidden = true; $('mailBtn').hidden = true; if (tab === 'admin') tab = 'pets'; toast('ออกจากระบบแล้ว ความคืบหน้ายังเก็บในเครื่องนี้'); updateAcctUI(); }
 async function doAccount(signup) {
   const name = $('acctName').value.trim().toLowerCase(), pass = $('acctPass').value, msg = $('acctMsg');
   msg.className = '';
@@ -1804,10 +1932,10 @@ const isPhone = () => window.matchMedia && window.matchMedia('(max-width: 700px)
 if (/\.netlify\.app$/i.test(location.hostname)) document.body.classList.add('has-badge');
 try { const pref = localStorage.getItem('dragonEggHunter.menu'); if (pref === '0' || (pref === null && isPhone())) setTimeout(() => setMenu(false), 0); } catch (e) {}
 onTap($('sideClose'), () => setMenu(false));
-document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b ? 'true' : 'false')); dirty = true; renderPanel(); }));
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { tab = b.dataset.tab; if (tab === 'admin') { admRender = true; admLoad(); } document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b ? 'true' : 'false')); dirty = true; renderPanel(); }));
 function iconCanvas(img) { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0); return c; }
 function el(tag, attrs, kids) { const e = document.createElement(tag); if (attrs) for (const k in attrs) { if (k === 'text') e.textContent = attrs[k]; else if (k === 'html') e.innerHTML = attrs[k]; else if (k.startsWith('on')) e.addEventListener(k.slice(2), attrs[k]); else e.setAttribute(k, attrs[k]); } (kids || []).forEach(c => c && e.appendChild(c)); return e; }
-function button(label, cls, enabled, fn) { const b = el('button', { class: 'btn ' + (cls || ''), text: label, onclick: () => { audioInit(); SFX.click(); fn(); recalcIncome(); dirty = true; renderPanel(); save(); } }); b.disabled = !enabled; return b; }
+function button(label, cls, enabled, fn) { const fn0 = fn; fn = (...a) => { if (tab === 'admin') admRender = true; return fn0(...a); }; const b = el('button', { class: 'btn ' + (cls || ''), text: label, onclick: () => { audioInit(); SFX.click(); fn(); recalcIncome(); dirty = true; renderPanel(); save(); } }); b.disabled = !enabled; return b; }
 function costBtn(label, cost, cls, fn, block) {
   const b = el('button', { class: 'btn ' + (cls || ''), text: label + ' 💰' + fmt(cost), onclick: () => {
     audioInit();
@@ -1821,9 +1949,10 @@ function costBtn(label, cost, cls, fn, block) {
 const stars = n => '★'.repeat(n);
 function petLabel(p) { return SPECIES[p.sp].name + ' ' + stars(p.star) + ' Lv.' + p.lv + ' · ' + RARITY[p.rar].name; }
 function renderPanel() {
+  if (tab === 'admin') { if (!admRender) { dirty = false; return; } admRender = false; dirty = true; }
   if (!dirty) { pane.querySelectorAll('button[data-cost]').forEach(b => { b.classList.toggle('off', S.gold < Number(b.dataset.cost)); }); pane.querySelectorAll('[data-prog]').forEach(e => { const d = S.dens[Number(e.dataset.prog)]; if (d) e.style.width = Math.min(100, d.t / d.total * 100) + '%'; }); return; }
   dirty = false; const sc = pane.scrollTop; pane.innerHTML = '';
-  if (tab === 'pets') renderPets(); else if (tab === 'breed') renderBreed(); else if (tab === 'aura') renderAura(); else if (tab === 'up') renderUpgrades(); else renderRebirth();
+  if (tab === 'pets') renderPets(); else if (tab === 'breed') renderBreed(); else if (tab === 'aura') renderAura(); else if (tab === 'admin') renderAdmin(); else if (tab === 'up') renderUpgrades(); else renderRebirth();
   pane.scrollTop = sc;
 }
 function renderPets() {
@@ -2061,6 +2190,7 @@ function renderWardrobe() {
   $('wdGold').textContent = '💰 ' + fmt(S.gold);
 }
 function closeWardrobe() {
+  if (!wardOpen || !wdDraft) { $('wardrobe').hidden = true; wardOpen = false; return; }
   // anything not owned falls back to what was worn before
   Object.keys(LOOK_CATS).forEach(c => { if (!ownedItem(c, wdDraft[c])) wdDraft[c] = ownedItem(c, S.look[c]) ? S.look[c] : S.owned[c][0]; });
   S.look = Object.assign({}, wdDraft); S.lookSet = true; refreshPlayer();
@@ -2074,6 +2204,10 @@ function drawWardrobePreview(t) {
   wdc.drawImage(img, 66 - img.width * sc / 2, 180 - img.height * sc - Math.abs(Math.sin(t * 6)) * 4, img.width * sc, img.height * sc);
 }
 $('wdDone').addEventListener('click', closeWardrobe);
+onTap($('mailBtn'), () => { renderMail(); $('mailModal').hidden = false; refreshMail(); });
+$('mailClose').addEventListener('click', () => { $('mailModal').hidden = true; });
+$('mailAll').addEventListener('click', async () => { for (const m of mails) if (!claimed.has(m.id)) await claimMail(m); });
+setInterval(() => { if (supaOk && supa) refreshMail(); }, 120000);
 $('acctLogin').addEventListener('click', () => doAccount(false));
 $('acctSignup').addEventListener('click', () => doAccount(true));
 $('acctCancel').addEventListener('click', () => { $('acctModal').hidden = true; });
@@ -2112,7 +2246,7 @@ window.addEventListener('beforeunload', () => { if (started) save(true, true); }
 document.addEventListener('visibilitychange', () => { if (document.hidden && started) save(true, true); });
 resize(); recalcIncome(); renderPanel(); initSave();
 requestAnimationFrame(loop);
-window.__egg = { get supa() { return supa; }, get supaOk() { return supaOk; }, exportCode, parseCode, teamDps, renderStatus, openWardrobe, closeWardrobe, buildPlayer, refreshPlayer, HAIRS, HATS, OUTFITS, joy, usePotion, gainPotion, potMul, doRoll, AURAS, aMul, carryCap2: () => carryCap(), get reveal() { return reveal; }, get S() { return S; }, set S(v) { S = v; }, P, update, get nests() { return nests; }, get guards() { return guards; }, get thieves() { return thieves; }, spawnThief, spawnSecret, startEvent, tryUnlock, doRebirth, merge, startBreed, SPECIES, RECIPES, ZONES, speedOf, carryCap, totalIncome, recalcIncome, save, get hatch() { return hatch; }, get hatchQueue() { return hatchQueue; }, setDirty: () => { dirty = true; renderPanel(); }, TILE, petFrames };
+window.__egg = { refreshMail, get isAdmin() { return isAdmin; }, get mails() { return mails; }, get supa() { return supa; }, get supaOk() { return supaOk; }, exportCode, parseCode, teamDps, renderStatus, openWardrobe, closeWardrobe, buildPlayer, refreshPlayer, HAIRS, HATS, OUTFITS, joy, usePotion, gainPotion, potMul, doRoll, AURAS, aMul, carryCap2: () => carryCap(), get reveal() { return reveal; }, get S() { return S; }, set S(v) { S = v; }, P, update, get nests() { return nests; }, get guards() { return guards; }, get thieves() { return thieves; }, spawnThief, spawnSecret, startEvent, tryUnlock, doRebirth, merge, startBreed, SPECIES, RECIPES, ZONES, speedOf, carryCap, totalIncome, recalcIncome, save, get hatch() { return hatch; }, get hatchQueue() { return hatchQueue; }, setDirty: () => { dirty = true; renderPanel(); }, TILE, petFrames };
 })();
 </script>
 </body>
